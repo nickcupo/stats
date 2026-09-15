@@ -56,11 +56,6 @@ public struct Widget_c_s {
         guard let spacing = self.userSpacing else { return self.spacing }
         return (spacing / 2).rounded(.up)
     }
-    /// Padding on each side of a standalone widget menu bar item.
-    public var itemPadding: CGFloat {
-        guard let spacing = self.userSpacing else { return 0 }
-        return (spacing / 2).rounded(.up)
-    }
 }
 
 public struct Constants {

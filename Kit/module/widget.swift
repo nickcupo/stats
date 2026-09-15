@@ -275,10 +275,6 @@ public class SWidget {
     private var hoverTracker: MenuBarHoverTracker? = nil
     private var originX: CGFloat
     
-    private var padding: CGFloat {
-        Constants.Widget.itemPadding
-    }
-    
     public init(_ type: widget_t, defaultWidget: widget_t, module: String, item: widget_p, image: NSImage) {
         self.type = type
         self.module = module
@@ -290,10 +286,7 @@ public class SWidget {
         self.item.widthHandler = { [weak self] in
             self?.sizeCallback?()
             if let s = self, let item = s.menuBarItem {
-                let width: CGFloat = s.item.frame.width + s.padding*2
-                if item.length != width {
-                    item.length = width
-                }
+                s.layout(item)
             }
         }
         self.item.identifier = NSUserInterfaceItemIdentifier(self.type.rawValue)
@@ -341,15 +334,17 @@ public class SWidget {
             }
             DispatchQueue.main.async(execute: {
                 guard self.menuBarItem == nil else { return }
-                self.menuBarItem = NSStatusBar.system.statusItem(withLength: self.item.frame.width + self.padding*2)
+                self.menuBarItem = NSStatusBar.system.statusItem(withLength: self.item.frame.width)
                 DispatchQueue.main.async(execute: {
                     self.menuBarItem?.autosaveName = "\(self.module)_\(self.type.rawValue)"
                 })
-                let x = self.originX + self.padding
-                if self.item.frame.origin.x != x {
-                    self.item.setFrameOrigin(NSPoint(x: x, y: self.item.frame.origin.y))
+                if self.item.frame.origin.x != self.originX {
+                    self.item.setFrameOrigin(NSPoint(x: self.originX, y: self.item.frame.origin.y))
                 }
                 self.menuBarItem?.button?.addSubview(self.item)
+                if let item = self.menuBarItem {
+                    self.layout(item)
+                }
                 self.menuBarItem?.button?.image = NSImage()
                 self.menuBarItem?.button?.toolTip = "\(localizedString(self.module)): \(self.type.name())"
                 
@@ -386,9 +381,12 @@ public class SWidget {
     internal func applySpacing() {
         DispatchQueue.main.async(execute: {
             guard let item = self.menuBarItem else { return }
-            self.item.setFrameOrigin(NSPoint(x: self.originX + self.padding, y: self.item.frame.origin.y))
-            item.length = self.item.frame.width + self.padding*2
+            self.layout(item)
         })
+    }
+    
+    private func layout(_ item: NSStatusItem) {
+        layoutMenuBarItem(item, view: self.item, width: self.item.frame.width, originX: self.originX, contentEdge: 0, combined: false)
     }
     
     @objc private func togglePopup() {
@@ -408,6 +406,33 @@ public class SWidget {
             }
             NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: userInfo)
         }
+    }
+}
+
+/// Places a widget view inside its status item and sets the item length.
+///
+/// macOS surrounds every status item button with a fixed inset (8pt by default) that an app cannot change.
+/// When the user has chosen a menu bar spacing, the view is pulled into that inset (the item window does
+/// not clip it) and the length is reduced accordingly, so the visible padding around the item follows the
+/// chosen spacing instead of the system value.
+///
+/// - contentEdge: padding already present inside the view at its edges
+/// - combined: the item is the single combined block whose neighbours are native items (keeps enough
+///   padding so that, together with the neighbour's inset, the gap matches the spacing)
+public func layoutMenuBarItem(_ item: NSStatusItem, view: NSView, width: CGFloat, originX: CGFloat = 0, contentEdge: CGFloat, combined: Bool) {
+    var trim: CGFloat = 0
+    if let spacing = Constants.Widget.userSpacing, let button = item.button {
+        let inset = button.superview?.frame.origin.x ?? 0
+        let wanted = combined ? max(0, spacing - inset) : spacing / 2
+        trim = min(max((inset + contentEdge - wanted).rounded(), 0), inset)
+        if width - trim*2 < 1 {
+            trim = 0
+        }
+    }
+    view.setFrameOrigin(NSPoint(x: originX - trim, y: view.frame.origin.y))
+    let length = width - trim*2
+    if item.length != length {
+        item.length = length
     }
 }
 
@@ -632,9 +657,12 @@ public class MenuBar {
         let w = self.activeWidgets.isEmpty ? 0 : self.activeWidgets.map({ $0.item.frame.width }).reduce(0, +) +
             (CGFloat(self.activeWidgets.count - 1) * Constants.Widget.gap) +
             Constants.Widget.oneViewPadding * 2
-        self.menuBarItem?.length = w
-        self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
         self.view.setFrameSize(NSSize(width: w, height: Constants.Widget.height))
+        if let item = self.menuBarItem {
+            layoutMenuBarItem(item, view: self.view, width: w, contentEdge: Constants.Widget.oneViewPadding, combined: false)
+        } else {
+            self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
+        }
         
         self.view.recalculate(self.sortedWidgets)
         self.callback?()

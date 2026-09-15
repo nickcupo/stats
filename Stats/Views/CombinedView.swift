@@ -12,8 +12,6 @@
 import Cocoa
 import Kit
 
-
-
 internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     private var menuBarItem: NSStatusItem? = nil
     private var hoverTracker: MenuBarHoverTracker? = nil
@@ -125,7 +123,9 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         }
         w = max(0, w - edge)
         self.view.setFrameSize(NSSize(width: w, height: self.view.frame.height))
-        self.menuBarItem?.length = w
+        if let item = self.menuBarItem {
+            layoutMenuBarItem(item, view: self.view, width: w, contentEdge: 0, combined: true)
+        }
     }
     
     // call when popup appear/disappear
