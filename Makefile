@@ -1,5 +1,9 @@
 APP = Stats
 BUNDLE_ID = eu.exelban.$(APP)
+# signing overrides for this fork (Developer ID); use SIGNING_CONFIG=Signing.xcconfig for a local dev build
+SIGNING_CONFIG ?= Release.xcconfig
+# keychain profile created once with: xcrun notarytool store-credentials "$(NOTARY_PROFILE)"
+NOTARY_PROFILE ?= AC_PASSWORD
 
 BUILD_PATH = $(PWD)/build
 APP_PATH = "$(BUILD_PATH)/$(APP).app"
@@ -21,6 +25,7 @@ archive: clean
   		-scheme $(APP) \
   		-destination 'platform=OS X,arch=x86_64' \
   		-configuration Release archive \
+  		-xcconfig "$(PWD)/$(SIGNING_CONFIG)" \
   		-archivePath $(BUILD_PATH)/$(APP).xcarchive
 
 	echo "Application built, starting the export archive..."
@@ -38,7 +43,7 @@ notarize:
 	osascript -e 'display notification "Submitting app for notarization..." with title "Build the Stats"'
 	echo "Submitting app for notarization..."
 
-	xcrun notarytool submit --keychain-profile "AC_PASSWORD" --wait $(ZIP_PATH)
+	xcrun notarytool submit --keychain-profile "$(NOTARY_PROFILE)" --wait $(ZIP_PATH)
 
 	echo "Stats successfully notarized"
 
@@ -122,10 +127,10 @@ next-version:
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $$versionNumber" "$(PWD)/Stats/Supporting Files/Info.plist" ;\
 
 check:
-	xcrun notarytool log 2d0045cc-8f0d-4f4c-ba6f-728895fd064a --keychain-profile "AC_PASSWORD"
+	xcrun notarytool log 2d0045cc-8f0d-4f4c-ba6f-728895fd064a --keychain-profile "$(NOTARY_PROFILE)"
 
 history:
-	xcrun notarytool history --keychain-profile "AC_PASSWORD"
+	xcrun notarytool history --keychain-profile "$(NOTARY_PROFILE)"
 
 open:
 	osascript -e 'display notification "Stats signed and ready for distribution" with title "Build the Stats"'

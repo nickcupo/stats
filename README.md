@@ -7,6 +7,22 @@
 
 macOS system monitor in your menu bar
 
+> **This is a fork** of [exelban/stats](https://github.com/exelban/stats) by Nicholas Cupo with a few menu bar tweaks.
+> All credit for the app goes to Serhiy Mytrovtsiy; this fork only adds the options below and is not affiliated with the upstream project.
+>
+> - **Menu bar spacing** (Settings > General): a slider for the space between Stats widgets. With "Combined modules"
+>   on, it also controls the padding macOS draws around the Stats block, so the icons can sit much tighter than the
+>   system default.
+> - **Open details on hover** (Settings > General): resting the cursor on a widget opens its popup without a click,
+>   and without stealing focus from the app you are using. Moving across widgets switches popups.
+> - **Fit width to value** (Network widget settings): the speed widget sizes its numbers column to the unit shown
+>   instead of reserving space for the largest possible value.
+> - Labels under the circles in the CPU and GPU popups.
+>
+> Releases of this fork are published at [nickcupo/stats/releases](https://github.com/nickcupo/stats/releases) and the
+> in-app updater checks there. The fork keeps the upstream bundle identifier, so it installs in place of the official
+> Stats app and shares its settings. To build it yourself see [Building](#building-this-fork) at the end of this file.
+
 ## Installation
 ### Manual
 You can download the latest version [here](https://github.com/exelban/stats/releases/latest/download/Stats.dmg).
@@ -162,3 +178,16 @@ You can help by adding a new language or improving the existing translation.
 
 ## License
 [MIT License](https://github.com/exelban/stats/blob/master/LICENSE)
+
+## Building this fork
+Development build signed with your own Apple Development certificate (edit the team in `Signing.xcconfig`):
+```bash
+xcodebuild -scheme Stats -configuration Release -xcconfig Signing.xcconfig build
+```
+Distributable build (Developer ID + notarization). Once, create a "Developer ID Application" certificate for the team in
+`Release.xcconfig` and store notarization credentials with `xcrun notarytool store-credentials "AC_PASSWORD"`. Then:
+```bash
+make build
+```
+This archives, exports, notarizes, staples and produces `Stats.dmg` next to the Makefile. Attach that file to a GitHub
+release tagged `vX.Y.Z` (matching `MARKETING_VERSION`) so the in-app updater can find it.

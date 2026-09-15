@@ -266,8 +266,7 @@ public struct DiskSize {
 public func dashboardCaption(_ text: String, under view: NSView, height: CGFloat = 14, maxWidth: CGFloat = 90) -> NSTextField {
     let label = NSTextField(labelWithString: text)
     label.font = NSFont.systemFont(ofSize: 9, weight: .regular)
-    let needed = label.attributedStringValue.size().width.rounded(.up) + 4
-    let width = min(max(view.frame.width, needed), maxWidth)
+    let width = max(view.frame.width, maxWidth)
     label.frame = NSRect(x: view.frame.midX - width/2, y: view.frame.origin.y - height, width: width, height: height)
     label.textColor = .secondaryLabelColor
     label.alignment = .center
