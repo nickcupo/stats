@@ -262,10 +262,13 @@ public struct DiskSize {
 }
 
 /// Small centered caption placed directly below a dashboard view (for example a circle chart).
-public func dashboardCaption(_ text: String, under view: NSView, height: CGFloat = 14) -> NSTextField {
+/// The caption is centered on the view and may be wider than it (up to `maxWidth`) so words are not truncated.
+public func dashboardCaption(_ text: String, under view: NSView, height: CGFloat = 14, maxWidth: CGFloat = 90) -> NSTextField {
     let label = NSTextField(labelWithString: text)
-    label.frame = NSRect(x: view.frame.origin.x, y: view.frame.origin.y - height, width: view.frame.width, height: height)
     label.font = NSFont.systemFont(ofSize: 9, weight: .regular)
+    let needed = label.attributedStringValue.size().width.rounded(.up) + 4
+    let width = min(max(view.frame.width, needed), maxWidth)
+    label.frame = NSRect(x: view.frame.midX - width/2, y: view.frame.origin.y - height, width: width, height: height)
     label.textColor = .secondaryLabelColor
     label.alignment = .center
     label.lineBreakMode = .byTruncatingTail
