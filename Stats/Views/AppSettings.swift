@@ -54,6 +54,14 @@ class ApplicationSettings: NSStackView {
         get { Store.shared.bool(key: "keep_menubar_positions", defaultValue: false) }
         set { Store.shared.set(key: "keep_menubar_positions", value: newValue) }
     }
+    private var menuBarSpacing: String {
+        get { Store.shared.string(key: "menubar_spacing", defaultValue: "none") }
+        set { Store.shared.set(key: "menubar_spacing", value: newValue) }
+    }
+    private var popupOnHover: Bool {
+        get { Store.shared.bool(key: "popup_on_hover", defaultValue: false) }
+        set { Store.shared.set(key: "popup_on_hover", value: newValue) }
+    }
     
     private var updateSelector: NSPopUpButton?
     private var startAtLoginBtn: NSSwitch?
@@ -119,6 +127,15 @@ class ApplicationSettings: NSStackView {
             PreferencesRow(localizedString("Keep the menubar items position"), component: switchView(
                 action: #selector(self.toggleMenuBarPosition),
                 state: self.keepMenuBarPosition
+            )),
+            PreferencesRow(localizedString("Menu bar spacing"), component: selectView(
+                action: #selector(self.toggleMenuBarSpacing),
+                items: MenuBarSpacings,
+                selected: self.menuBarSpacing
+            )),
+            PreferencesRow(localizedString("Open details on hover"), component: switchView(
+                action: #selector(self.togglePopupOnHover),
+                state: self.popupOnHover
             )),
             PreferencesRow(localizedString("macOS widgets"), component: switchView(
                 action: #selector(self.toggleSystemWidgetsUpdatesState),
@@ -401,6 +418,16 @@ class ApplicationSettings: NSStackView {
     
     @objc private func toggleMenuBarPosition(_ sender: NSButton) {
         self.keepMenuBarPosition = sender.state == NSControl.StateValue.on
+    }
+    
+    @objc private func toggleMenuBarSpacing(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String else { return }
+        self.menuBarSpacing = key
+        NotificationCenter.default.post(name: .menuBarSpacing, object: nil, userInfo: nil)
+    }
+    
+    @objc private func togglePopupOnHover(_ sender: NSButton) {
+        self.popupOnHover = sender.state == NSControl.StateValue.on
     }
     
     @objc private func importSettings() {

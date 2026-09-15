@@ -14,6 +14,7 @@ import Kit
 
 internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     private var menuBarItem: NSStatusItem? = nil
+    private var hoverTracker: MenuBarHoverTracker? = nil
     private var view: NSView = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: Constants.Widget.height))
     private var popup: PopupWindow? = nil
     
@@ -77,12 +78,20 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         self.menuBarItem?.button?.action = #selector(self.handleClick)
         self.menuBarItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
         
+        if let button = self.menuBarItem?.button {
+            self.hoverTracker = MenuBarHoverTracker(button: button) { [weak self] in
+                self?.handleHover()
+            }
+        }
+        
         DispatchQueue.main.async(execute: {
             self.recalculate()
         })
     }
     
     public func disable() {
+        self.hoverTracker?.detach()
+        self.hoverTracker = nil
         if let item = self.menuBarItem {
             NSStatusBar.system.removeStatusItem(item)
         }
@@ -115,13 +124,21 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     
     @objc private func handleClick() {
         if self.combinedModulesPopup {
-            self.togglePopup()
+            self.togglePopup(hover: false)
         } else {
-            self.openModulePopup()
+            self.openModulePopup(hover: false)
         }
     }
     
-    private func openModulePopup() {
+    private func handleHover() {
+        if self.combinedModulesPopup {
+            self.togglePopup(hover: true)
+        } else {
+            self.openModulePopup(hover: true)
+        }
+    }
+    
+    private func openModulePopup(hover: Bool) {
         guard let window = self.menuBarItem?.button?.window else { return }
         let location = self.view.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
         let visibleModules = self.activeModules.filter({ !$0.menuBar.activeWidgets.isEmpty })
@@ -137,16 +154,31 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         if let widget = widgets.last(where: { $0.item.frame.minX <= widgetLocation.x }) ?? widgets.first {
             userInfo["widget"] = widget.type
         }
+        if hover {
+            userInfo["hover"] = true
+        }
         NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: userInfo)
     }
     
-    private func togglePopup() {
+    private func togglePopup(hover: Bool) {
         guard let popup = self.popup, let item = self.menuBarItem, let window = item.button?.window else { return }
         let openedWindows = NSApplication.shared.windows.filter{ $0 is NSPanel }
         openedWindows.forEach{ $0.setIsVisible(false) }
         
-        if popup.occlusionState.rawValue == 8192 {
-            NSApplication.shared.activate(ignoringOtherApps: true)
+        if hover {
+            // hover only ever opens the popup; closing is handled by the popup itself once the cursor leaves
+            if popup.isVisible {
+                popup.startHoverTracking(anchor: window.frame)
+                return
+            }
+            NSApplication.shared.windows.filter{ $0 is PopupWindow && $0 != popup }.forEach{ $0.setIsVisible(false) }
+        }
+        
+        if popup.occlusionState.rawValue == 8192 || hover {
+            if !hover {
+                popup.level = .normal
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
             
             popup.contentView?.invalidateIntrinsicContentSize()
             
@@ -165,7 +197,11 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
             }
             
             popup.setFrameOrigin(NSPoint(x: x, y: y))
-            popup.setIsVisible(true)
+            if hover {
+                popup.showOnHover(anchor: window.frame)
+            } else {
+                popup.setIsVisible(true)
+            }
         } else {
             popup.setIsVisible(false)
         }

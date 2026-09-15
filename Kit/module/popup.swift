@@ -118,6 +118,68 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
     public func windowWillMove(_ notification: Notification) {
         self.viewController.setCloseButton(true)
         self.locked = true
+        self.stopHoverTracking()
+    }
+    
+    public override func setIsVisible(_ flag: Bool) {
+        if !flag {
+            self.stopHoverTracking()
+        }
+        super.setIsVisible(flag)
+    }
+    
+    // MARK: - hover
+    
+    private var hoverTimer: Timer? = nil
+    private var hoverAnchor: NSRect = .zero
+    private var hoverMisses: Int = 0
+    private let hoverInterval: TimeInterval = 0.1
+    private let hoverMissesToClose: Int = 3
+    private let hoverTolerance: CGFloat = 6
+    
+    /// Shows the popup without activating the application (used by the "open on hover" option)
+    /// and closes it again once the cursor leaves both the menu bar item and the popup.
+    public func showOnHover(anchor: NSRect) {
+        self.level = .popUpMenu
+        self.setIsVisible(true)
+        self.orderFrontRegardless()
+        self.startHoverTracking(anchor: anchor)
+    }
+    
+    public func startHoverTracking(anchor: NSRect) {
+        self.stopHoverTracking()
+        self.hoverAnchor = anchor
+        self.hoverTimer = Timer.scheduledTimer(withTimeInterval: self.hoverInterval, repeats: true) { [weak self] _ in
+            self?.checkHover()
+        }
+    }
+    
+    public func stopHoverTracking() {
+        self.hoverTimer?.invalidate()
+        self.hoverTimer = nil
+        self.hoverMisses = 0
+    }
+    
+    private func checkHover() {
+        guard self.isVisible, !self.locked else {
+            self.stopHoverTracking()
+            return
+        }
+        
+        let mouse = NSEvent.mouseLocation
+        let anchor = self.hoverAnchor.insetBy(dx: -self.hoverTolerance, dy: -self.hoverTolerance)
+        let popup = self.frame.insetBy(dx: -self.hoverTolerance, dy: -self.hoverTolerance)
+        if anchor.contains(mouse) || popup.contains(mouse) {
+            self.hoverMisses = 0
+            return
+        }
+        
+        self.hoverMisses += 1
+        if self.hoverMisses >= self.hoverMissesToClose {
+            self.stopHoverTracking()
+            self.viewController.setCloseButton(false)
+            self.setIsVisible(false)
+        }
     }
     
     public func windowDidResignKey(_ notification: Notification) {

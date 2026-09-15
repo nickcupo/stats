@@ -272,7 +272,12 @@ public class SWidget {
     }
     
     private var menuBarItem: NSStatusItem? = nil
+    private var hoverTracker: MenuBarHoverTracker? = nil
     private var originX: CGFloat
+    
+    private var padding: CGFloat {
+        Constants.Widget.itemPadding
+    }
     
     public init(_ type: widget_t, defaultWidget: widget_t, module: String, item: widget_p, image: NSImage) {
         self.type = type
@@ -284,8 +289,11 @@ public class SWidget {
         
         self.item.widthHandler = { [weak self] in
             self?.sizeCallback?()
-            if let s = self, let item = s.menuBarItem, let width: CGFloat = self?.item.frame.width, item.length != width {
-                item.length = width
+            if let s = self, let item = s.menuBarItem {
+                let width: CGFloat = s.item.frame.width + s.padding*2
+                if item.length != width {
+                    item.length = width
+                }
             }
         }
         self.item.identifier = NSUserInterfaceItemIdentifier(self.type.rawValue)
@@ -333,12 +341,13 @@ public class SWidget {
             }
             DispatchQueue.main.async(execute: {
                 guard self.menuBarItem == nil else { return }
-                self.menuBarItem = NSStatusBar.system.statusItem(withLength: self.item.frame.width)
+                self.menuBarItem = NSStatusBar.system.statusItem(withLength: self.item.frame.width + self.padding*2)
                 DispatchQueue.main.async(execute: {
                     self.menuBarItem?.autosaveName = "\(self.module)_\(self.type.rawValue)"
                 })
-                if self.item.frame.origin.x != self.originX {
-                    self.item.setFrameOrigin(NSPoint(x: self.originX, y: self.item.frame.origin.y))
+                let x = self.originX + self.padding
+                if self.item.frame.origin.x != x {
+                    self.item.setFrameOrigin(NSPoint(x: x, y: self.item.frame.origin.y))
                 }
                 self.menuBarItem?.button?.addSubview(self.item)
                 self.menuBarItem?.button?.image = NSImage()
@@ -351,6 +360,13 @@ public class SWidget {
                 self.menuBarItem?.button?.target = self
                 self.menuBarItem?.button?.action = #selector(self.togglePopup)
                 self.menuBarItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+                
+                if let button = self.menuBarItem?.button {
+                    weak let widget = self
+                    self.hoverTracker = MenuBarHoverTracker(button: button) {
+                        widget?.openPopup(hover: true)
+                    }
+                }
             })
         } else {
             DispatchQueue.main.async(execute: {
@@ -358,21 +374,101 @@ public class SWidget {
                 if self.keepMenuBarPosition {
                     saveNSStatusItemPosition(id: "\(self.module)_\(self.type.rawValue)")
                 }
+                self.hoverTracker?.detach()
+                self.hoverTracker = nil
                 NSStatusBar.system.removeStatusItem(item)
                 self.menuBarItem = nil
             })
         }
     }
     
+    // re-apply the user-defined spacing to a standalone menu bar item
+    internal func applySpacing() {
+        DispatchQueue.main.async(execute: {
+            guard let item = self.menuBarItem else { return }
+            self.item.setFrameOrigin(NSPoint(x: self.originX + self.padding, y: self.item.frame.origin.y))
+            item.length = self.item.frame.width + self.padding*2
+        })
+    }
+    
     @objc private func togglePopup() {
+        self.openPopup(hover: false)
+    }
+    
+    private func openPopup(hover: Bool) {
         if let item = self.menuBarItem, let window = item.button?.window {
-            NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: [
+            var userInfo: [String: Any] = [
                 "module": self.module,
                 "widget": self.type,
                 "origin": window.frame.origin,
                 "center": window.frame.width/2
-            ])
+            ]
+            if hover {
+                userInfo["hover"] = true
+            }
+            NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: userInfo)
         }
+    }
+}
+
+/// Watches the mouse over a menu bar button and fires a handler when the cursor rests on it,
+/// if the "open popup on hover" option is enabled.
+public class MenuBarHoverTracker: NSResponder {
+    public static var isEnabled: Bool {
+        Store.shared.bool(key: "popup_on_hover", defaultValue: false)
+    }
+    public static let delay: TimeInterval = 0.25
+    
+    private weak var button: NSView?
+    private var trackingArea: NSTrackingArea? = nil
+    private var timer: Timer? = nil
+    private let handler: () -> Void
+    
+    public init(button: NSView, handler: @escaping () -> Void) {
+        self.button = button
+        self.handler = handler
+        super.init()
+        
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        button.addTrackingArea(area)
+        self.trackingArea = area
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        self.detach()
+    }
+    
+    public func detach() {
+        self.timer?.invalidate()
+        self.timer = nil
+        if let area = self.trackingArea, let button = self.button {
+            button.removeTrackingArea(area)
+        }
+        self.trackingArea = nil
+    }
+    
+    public override func mouseEntered(with event: NSEvent) {
+        guard MenuBarHoverTracker.isEnabled else { return }
+        self.timer?.invalidate()
+        self.timer = Timer.scheduledTimer(withTimeInterval: MenuBarHoverTracker.delay, repeats: false) { [weak self] _ in
+            self?.timer = nil
+            guard MenuBarHoverTracker.isEnabled else { return }
+            self?.handler()
+        }
+    }
+    
+    public override func mouseExited(with event: NSEvent) {
+        self.timer?.invalidate()
+        self.timer = nil
     }
 }
 
@@ -382,6 +478,7 @@ public class MenuBar {
     
     private var moduleName: String
     private var menuBarItem: NSStatusItem? = nil
+    private var hoverTracker: MenuBarHoverTracker? = nil
     private var queue: DispatchQueue
     
     private var combinedModules: Bool {
@@ -423,11 +520,13 @@ public class MenuBar {
         
         NotificationCenter.default.addObserver(self, selector: #selector(listenForOneView), name: .toggleOneView, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(listenForWidgetRearrange), name: .widgetRearrange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(listenForSpacingChange), name: .menuBarSpacing, object: nil)
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self, name: .toggleOneView, object: nil)
         NotificationCenter.default.removeObserver(self, name: .widgetRearrange, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .menuBarSpacing, object: nil)
     }
     
     public func append(_ widget: SWidget) {
@@ -496,9 +595,18 @@ public class MenuBar {
                 self.menuBarItem?.button?.action = #selector(self.togglePopup)
                 self.menuBarItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
                 
+                if let button = self.menuBarItem?.button {
+                    weak let menuBar = self
+                    self.hoverTracker = MenuBarHoverTracker(button: button) {
+                        menuBar?.openPopup(hover: true)
+                    }
+                }
+                
                 self.recalculateWidth()
             } else if let item = self.menuBarItem {
                 saveNSStatusItemPosition(id: self.moduleName)
+                self.hoverTracker?.detach()
+                self.hoverTracker = nil
                 NSStatusBar.system.removeStatusItem(item)
                 self.menuBarItem = nil
             }
@@ -509,8 +617,8 @@ public class MenuBar {
         guard self.oneView, self.active else { return }
         
         let w = self.activeWidgets.isEmpty ? 0 : self.activeWidgets.map({ $0.item.frame.width }).reduce(0, +) +
-            (CGFloat(self.activeWidgets.count - 1) * Constants.Widget.spacing) +
-            Constants.Widget.spacing * 2
+            (CGFloat(self.activeWidgets.count - 1) * Constants.Widget.gap) +
+            Constants.Widget.oneViewPadding * 2
         self.menuBarItem?.length = w
         self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
         self.view.setFrameSize(NSSize(width: w, height: Constants.Widget.height))
@@ -520,13 +628,31 @@ public class MenuBar {
     }
     
     @objc private func togglePopup() {
+        self.openPopup(hover: false)
+    }
+    
+    private func openPopup(hover: Bool) {
         if let item = self.menuBarItem, let window = item.button?.window {
-            NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: [
+            var userInfo: [String: Any] = [
                 "module": self.moduleName,
                 "origin": window.frame.origin,
                 "center": window.frame.width/2
-            ])
+            ]
+            if hover {
+                userInfo["hover"] = true
+            }
+            NotificationCenter.default.post(name: .togglePopup, object: nil, userInfo: userInfo)
         }
+    }
+    
+    @objc private func listenForSpacingChange(_ notification: Notification) {
+        DispatchQueue.main.async(execute: {
+            if self.oneView {
+                self.recalculateWidth()
+            } else {
+                self.activeWidgets.forEach { $0.applySpacing() }
+            }
+        })
     }
     
     @objc private func listenForOneView(_ notification: Notification) {
@@ -583,11 +709,11 @@ public class MenuBarView: NSView {
     }
     
     public func recalculate(_ list: [widget_t] = []) {
-        var x: CGFloat = Constants.Widget.spacing
+        var x: CGFloat = Constants.Widget.oneViewPadding
         list.forEach { (type: widget_t) in
             if let view = self.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier(type.rawValue) }) {
                 view.setFrameOrigin(NSPoint(x: x, y: view.frame.origin.y))
-                x = view.frame.origin.x + view.frame.width + Constants.Widget.spacing
+                x = view.frame.origin.x + view.frame.width + Constants.Widget.gap
             }
         }
     }

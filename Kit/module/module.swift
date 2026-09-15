@@ -297,6 +297,9 @@ open class Module {
             return
         }
         
+        let hover = notification.userInfo?["hover"] as? Bool ?? false
+        let anchor = NSRect(x: buttonOrigin.x, y: buttonOrigin.y, width: buttonCenter*2, height: Constants.Widget.height)
+        
         let openedWindows = NSApplication.shared.windows.filter{ $0 is NSPanel }
         openedWindows.forEach{ $0.setIsVisible(false) }
         
@@ -306,8 +309,20 @@ open class Module {
             popup.openedBy = widget
         }
         
-        if popup.occlusionState.rawValue == 8192 || reopen {
-            NSApplication.shared.activate(ignoringOtherApps: true)
+        if hover {
+            // hover only ever opens the popup; closing is handled by the popup itself once the cursor leaves
+            if popup.isVisible && !reopen {
+                popup.startHoverTracking(anchor: anchor)
+                return
+            }
+            NSApplication.shared.windows.filter{ $0 is PopupWindow && $0 != popup }.forEach{ $0.setIsVisible(false) }
+        }
+        
+        if popup.occlusionState.rawValue == 8192 || reopen || hover {
+            if !hover {
+                popup.level = .normal
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
             
             popup.contentView?.invalidateIntrinsicContentSize()
             
@@ -326,7 +341,11 @@ open class Module {
             }
             
             popup.setFrameOrigin(NSPoint(x: x, y: y))
-            popup.setIsVisible(true)
+            if hover {
+                popup.showOnHover(anchor: anchor)
+            } else {
+                popup.setIsVisible(true)
+            }
         } else {
             popup.locked = false
             popup.openedBy = nil

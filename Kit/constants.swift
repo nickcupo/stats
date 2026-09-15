@@ -40,6 +40,27 @@ public struct Widget_c_s {
         get { CGPoint(x: 0, y: 2) }
     }
     public let spacing: CGFloat = 2
+    
+    /// User-defined spacing between menu bar widgets (nil = default behaviour).
+    public var userSpacing: CGFloat? {
+        let value = Store.shared.string(key: "menubar_spacing", defaultValue: "none")
+        guard let number = Int(value) else { return nil }
+        return CGFloat(number)
+    }
+    /// Gap between widgets that share one menu bar item.
+    public var gap: CGFloat {
+        self.userSpacing ?? self.spacing
+    }
+    /// Padding on each side of a menu bar item that contains several widgets (one view / combined modules).
+    public var oneViewPadding: CGFloat {
+        guard let spacing = self.userSpacing else { return self.spacing }
+        return (spacing / 2).rounded(.up)
+    }
+    /// Padding on each side of a standalone widget menu bar item.
+    public var itemPadding: CGFloat {
+        guard let spacing = self.userSpacing else { return 0 }
+        return (spacing / 2).rounded(.up)
+    }
 }
 
 public struct Constants {
