@@ -1,38 +1,35 @@
-# Stats
+# Stats (fork)
 
-<a href="https://github.com/exelban/stats/releases"><p align="center"><img src="https://github.com/exelban/stats/raw/master/Stats/Supporting%20Files/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="120"></p></a>
+<p align="center"><img src="Stats/Supporting%20Files/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="120"></p>
 
-[![Stats](https://cdn.mac-stats.com/assets/images/menus.png)](https://github.com/exelban/stats/releases)
-[![Stats](https://cdn.mac-stats.com/assets/images/popups.png)](https://github.com/exelban/stats/releases)
+macOS system monitor in your menu bar.
 
-macOS system monitor in your menu bar
+This is a personal fork of [exelban/stats](https://github.com/exelban/stats) by Serhiy Mytrovtsiy, who wrote and
+maintains the app. The fork adds a handful of menu bar options (listed below) and is otherwise the upstream app.
+It is **not affiliated with or endorsed by the upstream project**, and it is maintained by [Nicholas Cupo](https://github.com/nickcupo)
+on a best-effort basis. If you are not specifically after the changes below, use the
+[official Stats](https://github.com/exelban/stats/releases).
 
-> **This is a fork** of [exelban/stats](https://github.com/exelban/stats) by Nicholas Cupo with a few menu bar tweaks.
-> All credit for the app goes to Serhiy Mytrovtsiy; this fork only adds the options below and is not affiliated with the upstream project.
->
-> - **Menu bar spacing** (Settings > General): a slider for the space between Stats widgets. With "Combined modules"
->   on, it also controls the padding macOS draws around the Stats block, so the icons can sit much tighter than the
->   system default.
-> - **Open details on hover** (Settings > General): resting the cursor on a widget opens its popup without a click,
->   and without stealing focus from the app you are using. Moving across widgets switches popups.
-> - **Fit width to value** (Network widget settings): the speed widget sizes its numbers column to the unit shown
->   instead of reserving space for the largest possible value.
-> - Labels under the circles in the CPU and GPU popups.
->
-> Releases of this fork are published at [nickcupo/stats/releases](https://github.com/nickcupo/stats/releases) and the
-> in-app updater checks there. The fork keeps the upstream bundle identifier, so it installs in place of the official
-> Stats app and shares its settings. To build it yourself see [Building](#building-this-fork) at the end of this file.
+## What this fork changes
+- **Menu bar spacing** (Settings > General): a slider for the space between Stats widgets. With *Combined modules* on,
+  it also controls the padding macOS draws around the Stats block, so the icons can sit much tighter than the system default.
+- **Open details on hover** (Settings > General): resting the cursor on a widget opens its popup without a click and
+  without taking focus away from the app you are using. Moving across widgets switches popups.
+- **Fit width to value** (Network widget settings): the speed widget sizes its numbers column to the unit shown instead
+  of reserving space for the largest possible value.
+- Labels under the circle charts in the CPU and GPU popups.
+- Update checks go to this fork's GitHub releases.
+
+Everything else, including all the features, modules and translations, is upstream's work.
 
 ## Installation
-### Manual
-You can download the latest version [here](https://github.com/exelban/stats/releases/latest/download/Stats.dmg).
-This will download a file called `Stats.dmg`. Open it and move the app to the application folder.
+Download `Stats.dmg` from the [latest release of this fork](https://github.com/nickcupo/stats/releases/latest/download/Stats.dmg),
+open it and move the app to the Applications folder. Releases are signed with a Developer ID certificate and notarized
+by Apple, so they open without extra steps.
 
-### Homebrew
-To install it using Homebrew, open the Terminal app and type:
-```bash
-brew install stats
-```
+The fork keeps upstream's bundle identifier (`eu.exelban.Stats`). Installing it **replaces the official Stats app** and
+uses the same settings; switching back is a matter of installing the official release again. Homebrew's `stats` formula
+installs the official app, not this fork.
 
 ### Uninstall
 Run the uninstall script bundled with the app (requires administrator privileges to remove the SMC helper):
@@ -47,11 +44,8 @@ The script quits Stats and removes:
 
 If the app has already been moved to the Trash, the script can be run directly from the repository:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/exelban/stats/master/Kit/scripts/uninstall.sh | sh
+curl -fsSL https://raw.githubusercontent.com/nickcupo/stats/master/Kit/scripts/uninstall.sh | sh
 ```
-
-### Legacy version
-Legacy version for older systems could be found [here](https://mac-stats.com/downloads).
 
 ## Requirements
 Stats is supported on macOS 12 (Monterey) and newer.
@@ -71,69 +65,72 @@ Stats is an application that allows you to monitor your macOS system.
  - Bluetooth devices
  - Multiple time zone clock
 
-## FAQs
+## Issues, questions and contributions
+Please keep the two projects apart so neither maintainer gets reports for code they did not write:
+
+- **Something about the options listed above**, or a problem that only happens with this fork: open an issue
+  [here](https://github.com/nickcupo/stats/issues). Pull requests for the fork's own features are welcome.
+- **Anything else** (a module, a sensor, a crash, a translation): it is upstream code, so check the
+  [upstream issues](https://github.com/exelban/stats/issues) first and report there, after confirming it also happens
+  with the official build. Upstream has its own contribution policy, described in its README; please respect it and do
+  not send upstream pull requests on behalf of this fork.
+
+Translations are inherited from upstream. New or improved translations are best contributed upstream so everyone gets them.
+
+## FAQ
 
 ### How do you change the order of the menu bar icons?
-macOS decides the order of the menu bar items not `Stats` - it may change after the first reboot after installing Stats.
+macOS decides the order of the menu bar items, not Stats. It may change after the first reboot after installing Stats.
 
-To change the order of any menu bar icon - macOS Mojave (version 10.14) and up.
+To change the order of any menu bar icon (macOS Mojave 10.14 and up):
 
 1. Hold down ⌘ (command key).
 2. Drag the icon to the desired position on the menu bar.
-3. Release ⌘ (command key)
+3. Release ⌘ (command key).
 
 ### Stats icons do not appear in the menu bar
-macOS 26 introduced a new privacy control under System Settings → Menu Bar. Apps must be explicitly allowed there to display menu bar items. If Stats is running with at least one module active and one widget enabled, but none of its icons show up in the menu bar, this is almost certainly the cause. More details you can find [here](https://github.com/exelban/stats/issues/3120).
+macOS 26 introduced a new privacy control under System Settings → Menu Bar. Apps must be explicitly allowed there to
+display menu bar items. If Stats is running with at least one module active and one widget enabled, but none of its
+icons show up, this is almost certainly the cause (see [upstream issue #3120](https://github.com/exelban/stats/issues/3120)).
 
 **Solution:** open **System Settings → Menu Bar** and toggle **Stats** ON.
 
 ### Desktop widgets not showing the data
-Due to a problem with high data load in the system process (`chronod`) responsible for communication between the app and widgets, communication is disabled by default on the Stats side. To enable it, the `macOS widgets` option must be enabled in the Stats settings. More details you can find [here](https://github.com/exelban/stats/issues/2733).
+Due to a problem with high data load in the system process (`chronod`) responsible for communication between the app
+and widgets, communication is disabled by default. To enable it, the `macOS widgets` option must be enabled in the Stats
+settings (see [upstream issue #2733](https://github.com/exelban/stats/issues/2733)).
 
 **Solution:** open **Stats Settings** and toggle **macOS widgets** ON.
 
 ### How to reduce energy impact or CPU usage of Stats?
-Stats tries to be efficient as it's possible. But reading some data periodically is not a cheap task. Each module has its own "price". So, if you want to reduce energy impact from the Stats you need to disable some Stats modules. The most inefficient modules are Sensors and Bluetooth. Disabling these modules could reduce CPU usage and power efficiency by up to 50% in some cases.
+Reading some data periodically is not a cheap task and each module has its own cost. To reduce the energy impact,
+disable modules you do not need. The most expensive modules are Sensors and Bluetooth; disabling them can reduce CPU
+usage noticeably.
 
 ### Fan control
-Fan control is in legacy mode. It does not receive any updates or fixes. It's not dropped from the app just because in the old Macs it works pretty acceptable. I'm open to accepting fixed or improvements (via PR) for this feature in case someone would like to help with that. But have no option and time to provide support for this feature.
+Fan control is in legacy mode upstream: it receives no updates or fixes and is kept only because it works acceptably on
+older Macs. This fork does not change it.
 
 ### Sensors show incorrect CPU/GPU core count
-CPU/GPU sensors are simply thermal zones (sensors) on the CPU/GPU. They have no relation to the number of cores or specific cores.
-For example, a CPU is typically divided into two clusters: efficiency and performance. Each cluster contains multiple temperature sensors, and Stats simply displays these sensors. However, "CPU Efficient Core 1" does not represent the temperature of a single efficient core—it only indicates one of the temperature sensors within the efficiency core cluster.
-Additionally, with each new SoC, Apple changes the sensor keys. As a result, it takes time to determine which SMC values correspond to the appropriate sensors. If anyone knows how to accurately match the sensors for Apple Silicon, please contact me.
+CPU/GPU sensors are thermal zones on the CPU/GPU and have no relation to the number of cores or to specific cores.
+A CPU is typically divided into efficiency and performance clusters, each containing several temperature sensors, and
+Stats simply displays those sensors. "CPU Efficient Core 1" is one temperature sensor within the efficiency cluster, not
+the temperature of a single core. Apple also changes the sensor keys with each new SoC, so matching them takes time.
 
 ### App crash – what to do?
-First, ensure that you are using the latest version of Stats. There is a high chance that a fix preventing the crash has already been released. If you are already running the latest version, check the open issues. Only if none of the existing issues address your problem should you open a new issue.
+Make sure you run the latest release. If it still crashes, check whether it also happens with the official Stats build:
+if it does, it is an upstream problem and belongs in the upstream issue tracker; if it only happens with this fork,
+open an issue here.
 
-### Why my issue was closed without any response?
-Most probably because it's a duplicated issue and there is an answer to the question, report, or proposition. Please use a search by closed issues to get an answer.
-So, if your issue was closed without any response, most probably it already has a response.
+## External services
+Stats does not collect any telemetry or analytics. This fork makes the following external requests:
 
-### External API
-Stats does not collect any telemetry or analytics. The only external requests it makes are to the following APIs:
-
-- https://api.mac-stats.com – For update checks and retrieving the public IP address
-- https://api.github.com – Fallback for update checks
-
-Both of these APIs are used to check for updates. Additionally, an external request is required to obtain the public IP address. I do not want to use any third-party providers for retrieving the public IP address, so I use my own server for this purpose.
-
-If you have concerns about these requests, you have a few options:
-
-- propose a PR that allows these features to work without an external server
-- block both of these servers using any network filtering app (if you're reading this, you're likely using something like Little Snitch, so you can easily do this). In this case do not expect to receive any updates or see your public IP in the network module.
-
-### How to contribute to the project?
-If you want to develop a new feature, or you've found something that doesn't work, the first step is to open an issue so the feature or problem can be discussed. Pull requests should only be opened for existing issues and after discussion; otherwise, they may be closed automatically. There are a few cases where this can be skipped: language changes, and contributors who have already made significant contributions and whose implementations align well with the project.
-
-## Open source, but not open contribution
-Stats is an open-source project: the full source code is available under the MIT license, and you are free to read it, learn from it, fork it, and build your own version of the app.
-
-However, it is not an open-contribution project. Stats is developed and maintained by a single person, and keeping the project stable and coherent takes priority over accepting every proposed change. Reviewing external code, testing it across different Macs and macOS versions, and maintaining it afterward often takes more time than writing it in the first place.
-
-For that reason, unsolicited pull requests are generally not accepted and may be closed without review. If you want to change or add something, please open an issue first so it can be discussed. The exceptions are translations and language fixes, which are always welcome, and contributions from people who have already made significant contributions to the project.
-
-The best ways to support the project are reporting bugs, improving translations, and proposing ideas through issues.
+- `https://api.github.com` – update checks against this fork's releases (the upstream release server is no longer used).
+- `https://api.mac-stats.com/ip` – the public IP address shown in the Network module. This endpoint is run by the
+  upstream author and is unchanged from upstream. If you would rather not use it, disable the public IP option in the
+  Network module or block the host with a network filter.
+- The optional **System Stats** remote monitoring feature (Remote module) talks to the upstream author's hosted service
+  exactly as the official app does. This fork does not run or change that service.
 
 ## Supported languages
 - English
@@ -177,17 +174,25 @@ The best ways to support the project are reporting bugs, improving translations,
 You can help by adding a new language or improving the existing translation.
 
 ## License
-[MIT License](https://github.com/exelban/stats/blob/master/LICENSE)
+Stats is released under the [MIT License](LICENSE), copyright (c) 2019 Serhiy Mytrovtsiy. The changes in this fork are
+released under the same license. The license file, the copyright notice and the translator credits above must be kept
+in any further fork or redistribution.
 
-## Building this fork
-Development build signed with your own Apple Development certificate (edit the team in `Signing.xcconfig`):
+## Building
+Clone the repository and open `Stats.xcodeproj`, or build from the command line.
+
+A build signed with your own Apple Development certificate (put your team ID in `Signing.xcconfig`):
 ```bash
 xcodebuild -scheme Stats -configuration Release -xcconfig Signing.xcconfig build
 ```
-Distributable build (Developer ID + notarization). Once, create a "Developer ID Application" certificate for the team in
-`Release.xcconfig` and store notarization credentials with `xcrun notarytool store-credentials "AC_PASSWORD"`. Then:
+
+A distributable build needs a *Developer ID Application* certificate for the team in `Release.xcconfig` and, once,
+stored notarization credentials (`xcrun notarytool store-credentials "AC_PASSWORD"`). Then:
 ```bash
 make build
 ```
-This archives, exports, notarizes, staples and produces `Stats.dmg` next to the Makefile. Attach that file to a GitHub
-release tagged `vX.Y.Z` (matching `MARKETING_VERSION`) so the in-app updater can find it.
+This archives, exports, notarizes, staples and produces `Stats.dmg` next to the Makefile. The in-app updater looks for a
+GitHub release tagged `vX.Y.Z` (matching `MARKETING_VERSION`) with a `Stats.dmg` asset attached.
+
+If you fork this fork, change the update source in `Stats/AppDelegate.swift` to your own repository so your users are
+not offered releases from here.
