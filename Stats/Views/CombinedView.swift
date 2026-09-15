@@ -171,7 +171,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     }
     
     private func followHover() {
-        guard MenuBarHoverTracker.isEnabled, MenuBarHoverTracker.isPopupVisible else {
+        guard MenuBarHoverTracker.isEnabled, MenuBarHoverTracker.isPopupVisible, !MenuBarHoverTracker.isPinnedPopupVisible else {
             self.stopHoverFollow()
             self.hoverModule = nil
             return
@@ -207,6 +207,9 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         if let widget = widgets.last(where: { $0.item.frame.minX <= widgetLocation.x }) ?? widgets.first {
             userInfo["widget"] = widget.type
         }
+        if let button = self.menuBarItem?.button {
+            userInfo["button"] = button
+        }
         if hover {
             userInfo["hover"] = true
         }
@@ -215,10 +218,20 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     
     private func togglePopup(hover: Bool) {
         guard let popup = self.popup, let item = self.menuBarItem, let window = item.button?.window else { return }
+        let hoverMode = MenuBarHoverTracker.isEnabled
         
-        // a click on a popup that hover opened pins it instead of toggling it
+        // hover never disturbs a popup that a click pinned
+        if hover && MenuBarHoverTracker.isPinnedPopupVisible {
+            return
+        }
+        // a click on a popup that hover opened pins it
         if !hover, popup.isVisible, popup.isHoverTracking {
-            popup.pin()
+            popup.pin(anchor: window.frame, button: item.button)
+            return
+        }
+        // a click on the item of a pinned popup closes it
+        if !hover, hoverMode, popup.isVisible, popup.isPinned {
+            popup.setIsVisible(false)
             return
         }
         
@@ -231,11 +244,13 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
                 popup.startHoverTracking(anchor: window.frame)
                 return
             }
+        }
+        if hover || hoverMode {
             NSApplication.shared.windows.filter{ $0 is PopupWindow && $0 != popup }.forEach{ $0.setIsVisible(false) }
         }
         
-        if popup.occlusionState.rawValue == 8192 || hover {
-            if !hover {
+        if popup.occlusionState.rawValue == 8192 || hover || (hoverMode && !popup.isVisible) {
+            if !hover && !hoverMode {
                 popup.level = .normal
                 popup.animationBehavior = .default
                 NSApplication.shared.activate(ignoringOtherApps: true)
@@ -260,6 +275,8 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
             popup.setFrameOrigin(NSPoint(x: x, y: y))
             if hover {
                 popup.showOnHover(anchor: window.frame)
+            } else if hoverMode {
+                popup.showPinned(anchor: window.frame, button: item.button)
             } else {
                 popup.setIsVisible(true)
             }

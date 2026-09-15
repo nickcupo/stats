@@ -403,6 +403,9 @@ public class SWidget {
                 "origin": window.frame.origin,
                 "center": window.frame.width/2
             ]
+            if let button = item.button {
+                userInfo["button"] = button
+            }
             if hover {
                 userInfo["hover"] = true
             }
@@ -469,6 +472,11 @@ public class MenuBarHoverTracker: NSResponder {
         NSApplication.shared.windows.contains(where: { $0 is PopupWindow && $0.isVisible })
     }
     
+    /// true while a popup is pinned by a click; hover leaves everything alone until it is closed
+    public static var isPinnedPopupVisible: Bool {
+        NSApplication.shared.windows.contains(where: { ($0 as? PopupWindow)?.isPinned == true && $0.isVisible })
+    }
+    
     private weak var button: NSView?
     private var trackingArea: NSTrackingArea? = nil
     private var timer: Timer? = nil
@@ -522,7 +530,7 @@ public class MenuBarHoverTracker: NSResponder {
     }
     
     public override func mouseEntered(with event: NSEvent) {
-        guard MenuBarHoverTracker.isEnabled, !self.recentlyClicked else { return }
+        guard MenuBarHoverTracker.isEnabled, !self.recentlyClicked, !MenuBarHoverTracker.isPinnedPopupVisible else { return }
         self.timer?.invalidate()
         self.timer = nil
         
@@ -533,7 +541,7 @@ public class MenuBarHoverTracker: NSResponder {
         
         let timer = Timer(timeInterval: MenuBarHoverTracker.delay, repeats: false) { [weak self] _ in
             self?.timer = nil
-            guard let s = self, MenuBarHoverTracker.isEnabled, !s.recentlyClicked else { return }
+            guard let s = self, MenuBarHoverTracker.isEnabled, !s.recentlyClicked, !MenuBarHoverTracker.isPinnedPopupVisible else { return }
             s.handler()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -715,6 +723,9 @@ public class MenuBar {
                 "origin": window.frame.origin,
                 "center": window.frame.width/2
             ]
+            if let button = item.button {
+                userInfo["button"] = button
+            }
             if hover {
                 userInfo["hover"] = true
             }

@@ -298,14 +298,28 @@ open class Module {
         }
         
         let hover = notification.userInfo?["hover"] as? Bool ?? false
+        let hoverMode = MenuBarHoverTracker.isEnabled
+        let button = notification.userInfo?["button"] as? NSButton
+        let widget = notification.userInfo?["widget"] as? widget_t
         let anchor = NSRect(x: buttonOrigin.x, y: buttonOrigin.y, width: buttonCenter*2, height: Constants.Widget.height)
         
-        // a click on a popup that hover opened pins it instead of toggling it
+        // hover never disturbs a popup that a click pinned
+        if hover && MenuBarHoverTracker.isPinnedPopupVisible {
+            return
+        }
+        // a click on a popup that hover opened pins it
         if !hover, popup.isVisible, popup.isHoverTracking {
-            if let widget = notification.userInfo?["widget"] as? widget_t {
+            if let widget = widget {
                 popup.openedBy = widget
             }
-            popup.pin()
+            popup.pin(anchor: anchor, button: button)
+            return
+        }
+        // a click on the item of a pinned popup closes it
+        if !hover, hoverMode, popup.isVisible, popup.isPinned, widget == nil || popup.openedBy == widget {
+            popup.locked = false
+            popup.openedBy = nil
+            popup.setIsVisible(false)
             return
         }
         
@@ -324,11 +338,13 @@ open class Module {
                 popup.startHoverTracking(anchor: anchor)
                 return
             }
+        }
+        if hover || hoverMode {
             NSApplication.shared.windows.filter{ $0 is PopupWindow && $0 != popup }.forEach{ $0.setIsVisible(false) }
         }
         
-        if popup.occlusionState.rawValue == 8192 || reopen || hover {
-            if !hover {
+        if popup.occlusionState.rawValue == 8192 || reopen || hover || (hoverMode && !popup.isVisible) {
+            if !hover && !hoverMode {
                 popup.level = .normal
                 popup.animationBehavior = .default
                 NSApplication.shared.activate(ignoringOtherApps: true)
@@ -353,6 +369,8 @@ open class Module {
             popup.setFrameOrigin(NSPoint(x: x, y: y))
             if hover {
                 popup.showOnHover(anchor: anchor)
+            } else if hoverMode {
+                popup.showPinned(anchor: anchor, button: button)
             } else {
                 popup.setIsVisible(true)
             }

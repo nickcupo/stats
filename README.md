@@ -14,8 +14,8 @@ on a best-effort basis. If you are not specifically after the changes below, use
 - **Menu bar spacing** (Settings > General): a slider for the space between Stats widgets. With *Combined modules* on,
   it also controls the padding macOS draws around the Stats block, so the icons can sit much tighter than the system default.
 - **Open details on hover** (Settings > General): resting the cursor on a widget opens its popup without a click and
-  without taking focus away from the app you are using. Moving across widgets switches popups; a click pins the popup
-  open until you click the widget again or anywhere outside it.
+  without taking focus away from the app you are using. Moving across widgets switches popups. A click pins the popup:
+  the widget stays highlighted and the popup stays open until you click the widget again or anywhere outside it.
 - **Fit width to value** (Network widget settings): the speed widget sizes its numbers column to the unit shown instead
   of reserving space for the largest possible value.
 - Labels under the circle charts in the CPU and GPU popups.

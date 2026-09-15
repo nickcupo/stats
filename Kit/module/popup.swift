@@ -124,6 +124,7 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
     public override func setIsVisible(_ flag: Bool) {
         if !flag {
             self.stopHoverTracking()
+            self.unpin()
         }
         super.setIsVisible(flag)
     }
@@ -168,15 +169,96 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
         self.hoverTimer != nil
     }
     
-    /// Keeps a hover-opened popup open: it no longer follows the cursor, the app comes forward so the
-    /// popup can be used, and it closes on a click outside (or on the item / close button).
-    public func pin() {
+    // MARK: - pin
+    
+    /// true while the popup was pinned by a click (hover mode) and stays open until the next click elsewhere
+    public private(set) var isPinned: Bool = false
+    private var pinMonitors: [Any] = []
+    private weak var pinnedButton: NSButton?
+    private var highlightTimer: Timer? = nil
+    
+    /// Keeps the popup open. The window level is not changed and the app is not activated (both made the
+    /// screen flash): the popup stops following the cursor, shows its close button, keeps the menu bar item
+    /// highlighted like an open menu, and closes on the next click outside the popup and the item.
+    public func pin(anchor: NSRect, button: NSButton?) {
         self.stopHoverTracking()
-        self.level = .normal
-        self.animationBehavior = .default
+        self.hoverAnchor = anchor
         self.viewController.setCloseButton(true)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        self.makeKeyAndOrderFront(nil)
+        self.setHighlight(button)
+        guard !self.isPinned else { return }
+        self.isPinned = true
+        
+        let handler: (NSEvent) -> Void = { [weak self] _ in
+            guard let s = self, s.isPinned, s.isVisible, !s.locked else { return }
+            let point = NSEvent.mouseLocation
+            if s.frame.contains(point) || s.hoverAnchor.contains(point) {
+                return
+            }
+            s.viewController.setCloseButton(false)
+            s.setIsVisible(false)
+        }
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: handler) {
+            self.pinMonitors.append(monitor)
+        }
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { event in
+            handler(event)
+            return event
+        }) {
+            self.pinMonitors.append(monitor)
+        }
+    }
+    
+    /// Opens the popup already pinned, shown the same way hover shows it (no activation, no animation).
+    public func showPinned(anchor: NSRect, button: NSButton?) {
+        self.level = .popUpMenu
+        self.animationBehavior = .none
+        self.setIsVisible(true)
+        self.orderFrontRegardless()
+        self.pin(anchor: anchor, button: button)
+    }
+    
+    private func setHighlight(_ button: NSButton?) {
+        if let previous = self.pinnedButton, previous !== button {
+            previous.highlight(false)
+        }
+        self.pinnedButton = button
+        self.highlightTimer?.invalidate()
+        self.highlightTimer = nil
+        guard let button = button else { return }
+        
+        // the item's own click tracking clears the highlight when the mouse goes up,
+        // so apply it after the button is released (and re-apply for a few ticks)
+        var ticks = 0
+        var releasedTicks = 0
+        let timer = Timer(timeInterval: 0.03, repeats: true) { [weak self] t in
+            ticks += 1
+            guard let s = self, s.isPinned || ticks == 1 else {
+                t.invalidate()
+                return
+            }
+            if NSEvent.pressedMouseButtons == 0 || ticks > 60 {
+                button.highlight(true)
+                releasedTicks += 1
+                if releasedTicks >= 4 {
+                    t.invalidate()
+                    s.highlightTimer = nil
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.highlightTimer = timer
+    }
+    
+    private func unpin() {
+        self.highlightTimer?.invalidate()
+        self.highlightTimer = nil
+        self.pinnedButton?.highlight(false)
+        self.pinnedButton = nil
+        guard self.isPinned else { return }
+        self.isPinned = false
+        self.pinMonitors.forEach { NSEvent.removeMonitor($0) }
+        self.pinMonitors.removeAll()
     }
     
     private func checkHover() {
