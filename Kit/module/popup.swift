@@ -185,6 +185,11 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
         self.hoverAnchor = anchor
         self.viewController.setCloseButton(true)
         self.setHighlight(button)
+        // a popup that was just closed can still run its disappear handler, which hides the close button
+        DispatchQueue.main.async { [weak self] in
+            guard let s = self, s.isPinned, s.isVisible else { return }
+            s.viewController.setCloseButton(true)
+        }
         guard !self.isPinned else { return }
         self.isPinned = true
         

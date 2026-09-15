@@ -301,7 +301,8 @@ open class Module {
         let hoverMode = MenuBarHoverTracker.isEnabled
         let button = notification.userInfo?["button"] as? NSButton
         let widget = notification.userInfo?["widget"] as? widget_t
-        let anchor = NSRect(x: buttonOrigin.x, y: buttonOrigin.y, width: buttonCenter*2, height: Constants.Widget.height)
+        // the item's real window (the menu bar can be taller than the widget, e.g. 33pt on notched displays)
+        let anchor = button?.window?.frame ?? NSRect(x: buttonOrigin.x, y: buttonOrigin.y, width: buttonCenter*2, height: Constants.Widget.height)
         
         // hover never disturbs a popup that a click pinned
         if hover && MenuBarHoverTracker.isPinnedPopupVisible {
