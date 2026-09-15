@@ -13,7 +13,8 @@ import Cocoa
 import Kit
 
 internal class Popup: PopupWrapper {
-    private let dashboardHeight: CGFloat = 90
+    private let dashboardHeight: CGFloat = 104
+    private let dashboardCaptionHeight: CGFloat = 14
     private let chartHeight: CGFloat = 120 + Constants.Popup.separatorHeight + Constants.Popup.spacing*2
     private var detailsHeight: CGFloat {
         get {
@@ -83,6 +84,8 @@ internal class Popup: PopupWrapper {
     private var circle: PieChartView? = nil
     private var temperatureCircle: PieChartView? = nil
     private var frequencyCircle: PieChartView? = nil
+    private var temperatureCaption: NSTextField? = nil
+    private var frequencyCaption: NSTextField? = nil
     private var initializedProcesses: Bool = false
     
     private let loadCache = PopupCache<CPU_Load>()
@@ -200,12 +203,15 @@ internal class Popup: PopupWrapper {
         let view: NSView = NSView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: self.dashboardHeight))
         view.heightAnchor.constraint(equalToConstant: view.bounds.height).isActive = true
         
-        let usageSize = self.dashboardHeight-20
+        // circles live above a caption band that names each of them
+        let captionHeight = self.dashboardCaptionHeight
+        let area = self.dashboardHeight - captionHeight
+        let usageSize = area-20
         let usageX = (view.frame.width - usageSize)/2
         
-        let usage = NSView(frame: NSRect(x: usageX, y: (view.frame.height - usageSize)/2, width: usageSize, height: usageSize))
-        let temperature = NSView(frame: NSRect(x: (usageX - 50)/2, y: (view.frame.height - 50)/2 - 3, width: 50, height: 50))
-        let frequency = NSView(frame: NSRect(x: (usageX+usageSize) + (usageX - 50)/2, y: 0, width: 50, height: self.dashboardHeight))
+        let usage = NSView(frame: NSRect(x: usageX, y: captionHeight + (area - usageSize)/2, width: usageSize, height: usageSize))
+        let temperature = NSView(frame: NSRect(x: (usageX - 50)/2, y: captionHeight + (area - 50)/2 - 3, width: 50, height: 50))
+        let frequency = NSView(frame: NSRect(x: (usageX+usageSize) + (usageX - 50)/2, y: captionHeight + (area - 50)/2, width: 50, height: 50))
         
         self.circle = PieChartView(frame: NSRect(x: 0, y: 0, width: usage.frame.width, height: usage.frame.height), segments: [], drawValue: true)
         self.circle!.toolTip = localizedString("CPU usage")
@@ -221,9 +227,19 @@ internal class Popup: PopupWrapper {
         (self.frequencyCircle! as NSView).isHidden = true
         frequency.addSubview(self.frequencyCircle!)
         
+        let temperatureCaption = dashboardCaption(localizedString("Temperature"), under: temperature, height: captionHeight)
+        temperatureCaption.isHidden = true
+        self.temperatureCaption = temperatureCaption
+        let frequencyCaption = dashboardCaption(localizedString("Frequency"), under: frequency, height: captionHeight)
+        frequencyCaption.isHidden = true
+        self.frequencyCaption = frequencyCaption
+        
         view.addSubview(temperature)
         view.addSubview(usage)
         view.addSubview(frequency)
+        view.addSubview(temperatureCaption)
+        view.addSubview(dashboardCaption(localizedString("Usage"), under: usage, height: captionHeight))
+        view.addSubview(frequencyCaption)
         
         return view
     }
@@ -443,6 +459,7 @@ internal class Popup: PopupWrapper {
     private func renderTemperature(_ value: Double) {
         if let view = self.temperatureCircle, (view as NSView).isHidden {
             view.isHidden = false
+            self.temperatureCaption?.isHidden = false
         }
         
         self.temperatureCircle?.toolTip = "\(localizedString("CPU temperature")): \(temperature(value))"
@@ -463,6 +480,7 @@ internal class Popup: PopupWrapper {
         }
         if let view = self.frequencyCircle, (view as NSView).isHidden {
             view.isHidden = false
+            self.frequencyCaption?.isHidden = false
         }
         
         if let v = value.value {

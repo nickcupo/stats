@@ -261,6 +261,17 @@ public struct DiskSize {
     }
 }
 
+/// Small centered caption placed directly below a dashboard view (for example a circle chart).
+public func dashboardCaption(_ text: String, under view: NSView, height: CGFloat = 14) -> NSTextField {
+    let label = NSTextField(labelWithString: text)
+    label.frame = NSRect(x: view.frame.origin.x, y: view.frame.origin.y - height, width: view.frame.width, height: height)
+    label.font = NSFont.systemFont(ofSize: 9, weight: .regular)
+    label.textColor = .secondaryLabelColor
+    label.alignment = .center
+    label.lineBreakMode = .byTruncatingTail
+    return label
+}
+
 public class LabelField: NSTextField {
     public init(frame: NSRect = NSRect.zero, _ label: String = "", size: CGFloat = 12) {
         super.init(frame: frame)

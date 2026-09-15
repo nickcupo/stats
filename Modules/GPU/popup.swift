@@ -13,7 +13,8 @@ import Cocoa
 import Kit
 
 internal class Popup: PopupWrapper {
-    private let dashboardHeight: CGFloat = 90
+    private let dashboardHeight: CGFloat = 104
+    private let dashboardCaptionHeight: CGFloat = 14
     private let chartHeight: CGFloat = 90 + Constants.Popup.separatorHeight
     private let detailsHeight: CGFloat = (22*7) + Constants.Popup.separatorHeight
     
@@ -74,12 +75,15 @@ internal class Popup: PopupWrapper {
         let view: NSView = NSView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: self.dashboardHeight))
         view.heightAnchor.constraint(equalToConstant: view.bounds.height).isActive = true
         
-        let usageSize = self.dashboardHeight-20
+        // circles live above a caption band that names each of them
+        let captionHeight = self.dashboardCaptionHeight
+        let area = self.dashboardHeight - captionHeight
+        let usageSize = area-20
         let usageX = (view.frame.width - usageSize)/2
         
-        let usage = NSView(frame: NSRect(x: usageX, y: (view.frame.height - usageSize)/2, width: usageSize, height: usageSize))
-        let render = NSView(frame: NSRect(x: (usageX - 50)/2, y: (view.frame.height - 50)/2 - 3, width: 50, height: 50))
-        let tiler = NSView(frame: NSRect(x: (usageX+usageSize) + (usageX - 50)/2, y: 0, width: 50, height: self.dashboardHeight))
+        let usage = NSView(frame: NSRect(x: usageX, y: captionHeight + (area - usageSize)/2, width: usageSize, height: usageSize))
+        let render = NSView(frame: NSRect(x: (usageX - 50)/2, y: captionHeight + (area - 50)/2 - 3, width: 50, height: 50))
+        let tiler = NSView(frame: NSRect(x: (usageX+usageSize) + (usageX - 50)/2, y: captionHeight + (area - 50)/2, width: 50, height: 50))
         
         self.usageCircle = PieChartView(frame: NSRect(x: 0, y: 0, width: usage.frame.width, height: usage.frame.height), drawValue: true)
         self.usageCircle!.toolTip = localizedString("Utilization")
@@ -96,6 +100,9 @@ internal class Popup: PopupWrapper {
         view.addSubview(render)
         view.addSubview(usage)
         view.addSubview(tiler)
+        view.addSubview(dashboardCaption(localizedString("Render"), under: render, height: captionHeight))
+        view.addSubview(dashboardCaption(localizedString("Utilization"), under: usage, height: captionHeight))
+        view.addSubview(dashboardCaption(localizedString("Tiler"), under: tiler, height: captionHeight))
         
         return view
     }
