@@ -15,6 +15,7 @@ public class SpeedWidget: WidgetWrapper {
     private var icon: String = "dots"
     private var valueState: Bool = true
     private var unitsState: Bool = true
+    private var fitWidthState: Bool = true
     private var monochromeState: Bool = false
     private var valueColorState: String = "none"
     private var iconColorState: String = "default"
@@ -115,6 +116,7 @@ public class SpeedWidget: WidgetWrapper {
             self.valueState = Store.shared.bool(key: "\(self.title)_\(self.type.rawValue)_value", defaultValue: self.valueState)
             self.icon = Store.shared.string(key: "\(self.title)_\(self.type.rawValue)_icon", defaultValue: self.icon)
             self.unitsState = Store.shared.bool(key: "\(self.title)_\(self.type.rawValue)_units", defaultValue: self.unitsState)
+            self.fitWidthState = Store.shared.bool(key: "\(self.title)_\(self.type.rawValue)_fitWidth", defaultValue: self.fitWidthState)
             self.monochromeState = Store.shared.bool(key: "\(self.title)_\(self.type.rawValue)_monochrome", defaultValue: self.monochromeState)
             self.valueColorState = Store.shared.string(key: "\(self.title)_\(self.type.rawValue)_valueColor", defaultValue: self.valueColorState)
             if self.valueColorState == "0" {
@@ -253,14 +255,24 @@ public class SpeedWidget: WidgetWrapper {
             NSAttributedString.Key.paragraphStyle: style
         ]
         
-        let rect = CGRect(x: offset.x, y: (height-size)/2 + offset.y + 1, width: rowWidth - (Constants.Widget.margin.x*2), height: size)
         let value = NSAttributedString.init(
             string: Units(bytes: value).getReadableSpeed(base: base, unit: self.speedUnit, omitUnits: !self.unitsState),
             attributes: inputStringAttributes
         )
+        let columnWidth = self.valueColumnWidth(fixed: rowWidth, strings: [value])
+        let rect = CGRect(x: offset.x, y: (height-size)/2 + offset.y + 1, width: columnWidth - (Constants.Widget.margin.x*2), height: size)
         value.draw(with: rect)
         
-        return rowWidth
+        return columnWidth
+    }
+    
+    /// Width of the value column: the fixed width, or (when "fit width" is on) the width of the
+    /// longest value rounded up to a 4pt step so the widget does not resize on every refresh.
+    private func valueColumnWidth(fixed: CGFloat, strings: [NSAttributedString]) -> CGFloat {
+        guard self.fitWidthState else { return fixed }
+        let measured = strings.map({ $0.size().width }).max() ?? 0
+        let step: CGFloat = 4
+        return max(step, (measured / step).rounded(.up) * step) + (Constants.Widget.margin.x*2)
     }
     
     private func drawDot(_ offset: CGPoint, color: NSColor) -> CGFloat {
@@ -333,8 +345,9 @@ public class SpeedWidget: WidgetWrapper {
     // MARK: - two rows
     
     private func drawTwoRows() -> CGFloat {
-        var width: CGFloat = 7
-        var x: CGFloat = 7
+        let iconGap: CGFloat = self.fitWidthState && self.valueState ? 3 : 0
+        var width: CGFloat = 7 + iconGap
+        var x: CGFloat = 7 + iconGap
         
         if self.iconAlignmentState == "right" {
             x = 0
@@ -345,7 +358,6 @@ public class SpeedWidget: WidgetWrapper {
         }
         
         if self.valueState {
-            let rowWidth: CGFloat = self.unitsState ? 48 : 30
             let rowHeight: CGFloat = self.frame.height / 2
             let style = NSMutableParagraphStyle()
             style.alignment = self.valueAlignment
@@ -364,18 +376,20 @@ public class SpeedWidget: WidgetWrapper {
             let inputY: CGFloat = self.displayValueState == "io" ? rowHeight + 1 : 1
             let outputY: CGFloat = self.displayValueState == "io" ? 1 : rowHeight + 1
             
-            var rect = CGRect(x: Constants.Widget.margin.x + x, y: inputY, width: rowWidth - (Constants.Widget.margin.x*2), height: rowHeight)
             let input = NSAttributedString.init(
                 string: Units(bytes: self.inputValue).getReadableSpeed(base: base, unit: self.speedUnit, omitUnits: !self.unitsState),
                 attributes: inputStringAttributes
             )
-            input.draw(with: rect)
-            
-            rect = CGRect(x: Constants.Widget.margin.x + x, y: outputY, width: rowWidth - (Constants.Widget.margin.x*2), height: rowHeight)
             let output = NSAttributedString.init(
                 string: Units(bytes: self.outputValue).getReadableSpeed(base: base, unit: self.speedUnit, omitUnits: !self.unitsState),
                 attributes: outputStringAttributes
             )
+            let rowWidth = self.valueColumnWidth(fixed: self.unitsState ? 48 : 30, strings: [input, output])
+            
+            var rect = CGRect(x: Constants.Widget.margin.x + x, y: inputY, width: rowWidth - (Constants.Widget.margin.x*2), height: rowHeight)
+            input.draw(with: rect)
+            
+            rect = CGRect(x: Constants.Widget.margin.x + x, y: outputY, width: rowWidth - (Constants.Widget.margin.x*2), height: rowHeight)
             output.draw(with: rect)
             
             width += rowWidth
@@ -562,6 +576,10 @@ public class SpeedWidget: WidgetWrapper {
             PreferencesRow(localizedString("Units"), component: switchView(
                 action: #selector(self.toggleUnits),
                 state: self.unitsState
+            )),
+            PreferencesRow(localizedString("Fit width to value"), component: switchView(
+                action: #selector(self.toggleFitWidth),
+                state: self.fitWidthState
             ))
         ]))
         
@@ -621,6 +639,12 @@ public class SpeedWidget: WidgetWrapper {
     @objc private func toggleUnits(_ sender: NSControl) {
         self.unitsState = controlState(sender)
         Store.shared.set(key: "\(self.title)_\(self.type.rawValue)_units", value: self.unitsState)
+        self.display()
+    }
+    
+    @objc private func toggleFitWidth(_ sender: NSControl) {
+        self.fitWidthState = controlState(sender)
+        Store.shared.set(key: "\(self.title)_\(self.type.rawValue)_fitWidth", value: self.fitWidthState)
         self.display()
     }
     
