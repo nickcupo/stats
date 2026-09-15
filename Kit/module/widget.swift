@@ -285,8 +285,8 @@ public class SWidget {
         
         self.item.widthHandler = { [weak self] in
             self?.sizeCallback?()
-            if let s = self, let item = s.menuBarItem {
-                s.layout(item)
+            if let s = self, let item = s.menuBarItem, item.length != s.item.frame.width {
+                item.length = s.item.frame.width
             }
         }
         self.item.identifier = NSUserInterfaceItemIdentifier(self.type.rawValue)
@@ -342,9 +342,6 @@ public class SWidget {
                     self.item.setFrameOrigin(NSPoint(x: self.originX, y: self.item.frame.origin.y))
                 }
                 self.menuBarItem?.button?.addSubview(self.item)
-                if let item = self.menuBarItem {
-                    self.layout(item)
-                }
                 self.menuBarItem?.button?.image = NSImage()
                 self.menuBarItem?.button?.toolTip = "\(localizedString(self.module)): \(self.type.name())"
                 
@@ -377,16 +374,20 @@ public class SWidget {
         }
     }
     
-    // re-apply the user-defined spacing to a standalone menu bar item
-    internal func applySpacing() {
+    // re-create the standalone menu bar item so it picks up the app's status item spacing
+    internal func recreateMenuBarItem() {
+        guard self.menuBarItem != nil else { return }
         DispatchQueue.main.async(execute: {
             guard let item = self.menuBarItem else { return }
-            self.layout(item)
+            saveNSStatusItemPosition(id: "\(self.module)_\(self.type.rawValue)")
+            self.hoverTracker?.detach()
+            self.hoverTracker = nil
+            NSStatusBar.system.removeStatusItem(item)
+            self.menuBarItem = nil
+            self.item.removeFromSuperview()
+            restoreNSStatusItemPosition(id: "\(self.module)_\(self.type.rawValue)")
+            self.setMenuBarItem(state: true)
         })
-    }
-    
-    private func layout(_ item: NSStatusItem) {
-        layoutMenuBarItem(item, view: self.item, width: self.item.frame.width, originX: self.originX, contentEdge: 0, combined: false)
     }
     
     @objc private func togglePopup() {
@@ -409,30 +410,48 @@ public class SWidget {
     }
 }
 
-/// Places a widget view inside its status item and sets the item length.
+/// Applies the user's menu bar spacing to the padding macOS draws around this app's status items.
 ///
-/// macOS surrounds every status item button with a fixed inset (8pt by default) that an app cannot change.
-/// When the user has chosen a menu bar spacing, the view is pulled into that inset (the item window does
-/// not clip it) and the length is reduced accordingly, so the visible padding around the item follows the
-/// chosen spacing instead of the system value.
-///
-/// - contentEdge: padding already present inside the view at its edges
-/// - combined: the item is the single combined block whose neighbours are native items (keeps enough
-///   padding so that, together with the neighbour's inset, the gap matches the spacing)
-public func layoutMenuBarItem(_ item: NSStatusItem, view: NSView, width: CGFloat, originX: CGFloat = 0, contentEdge: CGFloat, combined: Bool) {
-    var trim: CGFloat = 0
-    if let spacing = Constants.Widget.userSpacing, let button = item.button {
-        let inset = button.superview?.frame.origin.x ?? 0
-        let wanted = combined ? max(0, spacing - inset) : spacing / 2
-        trim = min(max((inset + contentEdge - wanted).rounded(), 0), inset)
-        if width - trim*2 < 1 {
-            trim = 0
+/// AppKit reads `NSStatusItemSpacing` through the app's own user defaults, and uses half of it as the
+/// inset on each side of every status item of the app. Setting it in the app's domain therefore only
+/// affects Stats' items. The value is read when an item is created, so items are re-created after a change.
+public enum MenuBarSystemSpacing {
+    public static let key = "NSStatusItemSpacing"
+    
+    /// The value macOS uses when the app does not override it (the user's global setting, or 16).
+    public static var systemDefault: CGFloat {
+        if let value = CFPreferencesCopyValue(key as CFString, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost) as? NSNumber {
+            return CGFloat(truncating: value)
         }
+        if let value = CFPreferencesCopyValue(key as CFString, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? NSNumber {
+            return CGFloat(truncating: value)
+        }
+        return 16
     }
-    view.setFrameOrigin(NSPoint(x: originX - trim, y: view.frame.origin.y))
-    let length = width - trim*2
-    if item.length != length {
-        item.length = length
+    
+    /// Spacing to request for this app's items so that the gap between Stats widgets follows the user's value.
+    /// In combined mode the single block needs (spacing - neighbour inset) on each side; otherwise each item
+    /// contributes half of the gap to its neighbour.
+    public static func desired(spacing: CGFloat, combined: Bool) -> CGFloat {
+        let neighbourInset = systemDefault / 2
+        let ownInset = combined ? max(0, spacing - neighbourInset) : spacing / 2
+        return (ownInset * 2).rounded()
+    }
+    
+    /// Writes (or clears) the override. Call before status items are created, and again after a change.
+    public static func apply() {
+        let defaults = UserDefaults.standard
+        guard let spacing = Constants.Widget.userSpacing else {
+            if defaults.object(forKey: key) != nil {
+                defaults.removeObject(forKey: key)
+            }
+            return
+        }
+        let combined = Store.shared.bool(key: "CombinedModules", defaultValue: false)
+        let value = Int(desired(spacing: spacing, combined: combined))
+        if defaults.object(forKey: key) as? Int != value {
+            defaults.set(value, forKey: key)
+        }
     }
 }
 
@@ -559,12 +578,14 @@ public class MenuBar {
         NotificationCenter.default.addObserver(self, selector: #selector(listenForOneView), name: .toggleOneView, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(listenForWidgetRearrange), name: .widgetRearrange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(listenForSpacingChange), name: .menuBarSpacing, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(listenForRecreate), name: .menuBarRecreate, object: nil)
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self, name: .toggleOneView, object: nil)
         NotificationCenter.default.removeObserver(self, name: .widgetRearrange, object: nil)
         NotificationCenter.default.removeObserver(self, name: .menuBarSpacing, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .menuBarRecreate, object: nil)
     }
     
     public func append(_ widget: SWidget) {
@@ -657,12 +678,9 @@ public class MenuBar {
         let w = self.activeWidgets.isEmpty ? 0 : self.activeWidgets.map({ $0.item.frame.width }).reduce(0, +) +
             (CGFloat(self.activeWidgets.count - 1) * Constants.Widget.gap) +
             Constants.Widget.oneViewPadding * 2
+        self.menuBarItem?.length = w
+        self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
         self.view.setFrameSize(NSSize(width: w, height: Constants.Widget.height))
-        if let item = self.menuBarItem {
-            layoutMenuBarItem(item, view: self.view, width: w, contentEdge: Constants.Widget.oneViewPadding, combined: false)
-        } else {
-            self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
-        }
         
         self.view.recalculate(self.sortedWidgets)
         self.callback?()
@@ -690,10 +708,23 @@ public class MenuBar {
         DispatchQueue.main.async(execute: {
             if self.oneView {
                 self.recalculateWidth()
-            } else {
-                self.activeWidgets.forEach { $0.applySpacing() }
             }
         })
+    }
+    
+    // re-create this module's status items so they pick up the app's status item spacing
+    @objc private func listenForRecreate(_ notification: Notification) {
+        guard self.active else { return }
+        if self.combinedModules {
+            return
+        }
+        if self.oneView {
+            guard self.menuBarItem != nil else { return }
+            self.setupMenuBarItem(false)
+            self.setupMenuBarItem(true)
+        } else {
+            self.activeWidgets.forEach { $0.recreateMenuBarItem() }
+        }
     }
     
     @objc private func listenForOneView(_ notification: Notification) {

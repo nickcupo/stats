@@ -59,6 +59,7 @@ class ApplicationSettings: NSStackView {
         set { Store.shared.set(key: "menubar_spacing", value: "\(newValue)") }
     }
     private var menuBarSpacingView: NSView?
+    private var menuBarSpacingTimer: Timer?
     private var popupOnHover: Bool {
         get { Store.shared.bool(key: "popup_on_hover", defaultValue: false) }
         set { Store.shared.set(key: "popup_on_hover", value: newValue) }
@@ -401,6 +402,7 @@ class ApplicationSettings: NSStackView {
         self.combinedModulesView?.setRowVisibility(4, newState: self.combinedModulesState)
         self.combinedModulesView?.setRowVisibility(5, newState: self.combinedModulesState)
         self.combinedModulesView?.setRowVisibility(6, newState: self.combinedModulesState)
+        MenuBarSystemSpacing.apply()
         NotificationCenter.default.post(name: .toggleOneView, object: nil, userInfo: nil)
     }
     
@@ -432,6 +434,17 @@ class ApplicationSettings: NSStackView {
         guard value != self.menuBarSpacing else { return }
         self.menuBarSpacing = value
         NotificationCenter.default.post(name: .menuBarSpacing, object: nil, userInfo: nil)
+        
+        // the padding macOS draws around the items is only read when an item is created:
+        // apply it and re-create the items once the slider has settled
+        self.menuBarSpacingTimer?.invalidate()
+        self.menuBarSpacingTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { _ in
+            let before = UserDefaults.standard.object(forKey: MenuBarSystemSpacing.key) as? Int
+            MenuBarSystemSpacing.apply()
+            if UserDefaults.standard.object(forKey: MenuBarSystemSpacing.key) as? Int != before {
+                NotificationCenter.default.post(name: .menuBarRecreate, object: nil, userInfo: nil)
+            }
+        }
     }
     
     @objc private func togglePopupOnHover(_ sender: NSButton) {

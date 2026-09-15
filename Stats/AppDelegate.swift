@@ -62,6 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     
     static func main() {
         let launchStart = Date()
+        MenuBarSystemSpacing.apply()
         let app = NSApplication.shared
         let delegate = AppDelegate()
         delegate.launchStart = launchStart

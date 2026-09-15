@@ -266,13 +266,17 @@ public class SpeedWidget: WidgetWrapper {
         return columnWidth
     }
     
-    /// Width of the value column: the fixed width, or (when "fit width" is on) the width of the
-    /// longest value rounded up to a 4pt step so the widget does not resize on every refresh.
+    /// Width of the value column: the fixed width, or (when "fit width" is on) the width needed for a
+    /// three digit number in the unit currently displayed, so the widget only resizes when the unit changes.
     private func valueColumnWidth(fixed: CGFloat, strings: [NSAttributedString]) -> CGFloat {
         guard self.fitWidthState else { return fixed }
-        let measured = strings.map({ $0.size().width }).max() ?? 0
-        let step: CGFloat = 4
-        return max(step, (measured / step).rounded(.up) * step) + (Constants.Widget.margin.x*2)
+        let measured = strings.map { (value: NSAttributedString) -> CGFloat in
+            let template = NSMutableAttributedString(attributedString: value)
+            let digits = template.string.prefix(while: { $0.isNumber || $0 == "." || $0 == "," })
+            template.replaceCharacters(in: NSRange(location: 0, length: digits.utf16.count), with: "888")
+            return template.size().width
+        }.max() ?? 0
+        return measured.rounded(.up) + (Constants.Widget.margin.x*2)
     }
     
     private func drawDot(_ offset: CGPoint, color: NSColor) -> CGFloat {

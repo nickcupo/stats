@@ -60,11 +60,20 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         
         NotificationCenter.default.addObserver(self, selector: #selector(listenForOneView), name: .toggleOneView, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(listenForModuleRearrrange), name: .moduleRearrange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(listenForRecreate), name: .menuBarRecreate, object: nil)
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self, name: .toggleOneView, object: nil)
         NotificationCenter.default.removeObserver(self, name: .moduleRearrange, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .menuBarRecreate, object: nil)
+    }
+    
+    // re-create the combined item so it picks up the app's status item spacing
+    @objc private func listenForRecreate() {
+        guard self.status, self.menuBarItem != nil else { return }
+        self.disable()
+        self.enable()
     }
     
     public func enable() {
@@ -123,9 +132,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         }
         w = max(0, w - edge)
         self.view.setFrameSize(NSSize(width: w, height: self.view.frame.height))
-        if let item = self.menuBarItem {
-            layoutMenuBarItem(item, view: self.view, width: w, contentEdge: 0, combined: true)
-        }
+        self.menuBarItem?.length = w
     }
     
     // call when popup appear/disappear
