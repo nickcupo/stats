@@ -54,10 +54,11 @@ class ApplicationSettings: NSStackView {
         get { Store.shared.bool(key: "keep_menubar_positions", defaultValue: false) }
         set { Store.shared.set(key: "keep_menubar_positions", value: newValue) }
     }
-    private var menuBarSpacing: String {
-        get { Store.shared.string(key: "menubar_spacing", defaultValue: "none") }
-        set { Store.shared.set(key: "menubar_spacing", value: newValue) }
+    private var menuBarSpacing: Int {
+        get { Int(Store.shared.string(key: "menubar_spacing", defaultValue: "none")) ?? Int(Constants.Widget.spacing) }
+        set { Store.shared.set(key: "menubar_spacing", value: "\(newValue)") }
     }
+    private var menuBarSpacingView: NSView?
     private var popupOnHover: Bool {
         get { Store.shared.bool(key: "popup_on_hover", defaultValue: false) }
         set { Store.shared.set(key: "popup_on_hover", value: newValue) }
@@ -111,6 +112,13 @@ class ApplicationSettings: NSStackView {
             action: #selector(self.toggleLaunchAtLogin),
             state: LaunchAtLogin.isEnabled
         )
+        self.menuBarSpacingView = sliderView(
+            action: #selector(self.toggleMenuBarSpacing),
+            value: self.menuBarSpacing,
+            initialValue: "\(self.menuBarSpacing) px",
+            min: 0,
+            max: 20
+        )
         
         scrollView.stackView.addArrangedSubview(PreferencesSection([
             PreferencesRow(localizedString("Check for updates"), component: self.updateSelector!),
@@ -128,11 +136,7 @@ class ApplicationSettings: NSStackView {
                 action: #selector(self.toggleMenuBarPosition),
                 state: self.keepMenuBarPosition
             )),
-            PreferencesRow(localizedString("Menu bar spacing"), component: selectView(
-                action: #selector(self.toggleMenuBarSpacing),
-                items: MenuBarSpacings,
-                selected: self.menuBarSpacing
-            )),
+            PreferencesRow(localizedString("Menu bar spacing"), component: self.menuBarSpacingView!),
             PreferencesRow(localizedString("Open details on hover"), component: switchView(
                 action: #selector(self.togglePopupOnHover),
                 state: self.popupOnHover
@@ -420,9 +424,13 @@ class ApplicationSettings: NSStackView {
         self.keepMenuBarPosition = sender.state == NSControl.StateValue.on
     }
     
-    @objc private func toggleMenuBarSpacing(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String else { return }
-        self.menuBarSpacing = key
+    @objc private func toggleMenuBarSpacing(_ sender: NSSlider) {
+        let value = Int(sender.doubleValue.rounded())
+        if let field = self.menuBarSpacingView?.subviews.first(where: { $0 is NSTextField }) as? NSTextField {
+            field.stringValue = "\(value) px"
+        }
+        guard value != self.menuBarSpacing else { return }
+        self.menuBarSpacing = value
         NotificationCenter.default.post(name: .menuBarSpacing, object: nil, userInfo: nil)
     }
     

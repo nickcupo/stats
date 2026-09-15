@@ -12,9 +12,13 @@
 import Cocoa
 import Kit
 
+
+
 internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     private var menuBarItem: NSStatusItem? = nil
     private var hoverTracker: MenuBarHoverTracker? = nil
+    private var hoverModule: String? = nil
+    private var hoverTimer: Timer? = nil
     private var view: NSView = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: Constants.Widget.height))
     private var popup: PopupWindow? = nil
     
@@ -90,6 +94,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     }
     
     public func disable() {
+        self.stopHoverFollow()
         self.hoverTracker?.detach()
         self.hoverTracker = nil
         if let item = self.menuBarItem {
@@ -102,7 +107,10 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         self.view.subviews.forEach({ $0.removeFromSuperview() })
         
         let visibleModules = self.activeModules.filter({ !$0.menuBar.activeWidgets.isEmpty })
-        var w: CGFloat = 0
+        // with a user-defined spacing the block's outer edges rely on the system padding only,
+        // so the gap to neighbouring (native) items matches the menu bar; the padding stays between modules
+        let edge: CGFloat = Constants.Widget.userSpacing == nil ? 0 : Constants.Widget.oneViewPadding
+        var w: CGFloat = -edge
         visibleModules.enumerated().forEach { (i, m) in
             if i != 0 {
                 w += self.spacing
@@ -115,6 +123,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
             m.menuBar.view.setFrameOrigin(NSPoint(x: w, y: 0))
             w += m.menuBar.view.frame.width
         }
+        w = max(0, w - edge)
         self.view.setFrameSize(NSSize(width: w, height: self.view.frame.height))
         self.menuBarItem?.length = w
     }
@@ -138,11 +147,47 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         }
     }
     
-    private func openModulePopup(hover: Bool) {
-        guard let window = self.menuBarItem?.button?.window else { return }
+    // while a hover popup is open, follow the cursor from one module to the next inside the combined item
+    private func startHoverFollow() {
+        self.stopHoverFollow()
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            self?.followHover()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.hoverTimer = timer
+    }
+    
+    private func stopHoverFollow() {
+        self.hoverTimer?.invalidate()
+        self.hoverTimer = nil
+    }
+    
+    private func followHover() {
+        guard MenuBarHoverTracker.isEnabled, MenuBarHoverTracker.isPopupVisible else {
+            self.stopHoverFollow()
+            self.hoverModule = nil
+            return
+        }
+        guard !self.combinedModulesPopup,
+              let window = self.menuBarItem?.button?.window, window.frame.contains(NSEvent.mouseLocation),
+              let module = self.moduleUnderCursor(), module.name != self.hoverModule else { return }
+        self.openModulePopup(hover: true)
+    }
+    
+    private func moduleUnderCursor() -> Module? {
+        guard let window = self.menuBarItem?.button?.window else { return nil }
         let location = self.view.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
         let visibleModules = self.activeModules.filter({ !$0.menuBar.activeWidgets.isEmpty })
-        guard let module = visibleModules.last(where: { $0.menuBar.view.frame.minX <= location.x }) ?? visibleModules.first else { return }
+        return visibleModules.last(where: { $0.menuBar.view.frame.minX <= location.x }) ?? visibleModules.first
+    }
+    
+    private func openModulePopup(hover: Bool) {
+        guard let window = self.menuBarItem?.button?.window, let module = self.moduleUnderCursor() else { return }
+        let location = self.view.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        if hover {
+            self.hoverModule = module.name
+            self.startHoverFollow()
+        }
         
         var userInfo: [String: Any] = [
             "module": module.name,
@@ -177,6 +222,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
         if popup.occlusionState.rawValue == 8192 || hover {
             if !hover {
                 popup.level = .normal
+                popup.animationBehavior = .default
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
             

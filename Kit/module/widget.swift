@@ -417,13 +417,17 @@ public class MenuBarHoverTracker: NSResponder {
     public static var isEnabled: Bool {
         Store.shared.bool(key: "popup_on_hover", defaultValue: false)
     }
-    public static let delay: TimeInterval = 0.25
+    public static let delay: TimeInterval = 0.1
+    
+    /// true while any popup is already open, so moving to another item switches without delay
+    public static var isPopupVisible: Bool {
+        NSApplication.shared.windows.contains(where: { $0 is PopupWindow && $0.isVisible })
+    }
     
     private weak var button: NSView?
     private var trackingArea: NSTrackingArea? = nil
     private var timer: Timer? = nil
     private let handler: () -> Void
-    
     public init(button: NSView, handler: @escaping () -> Void) {
         self.button = button
         self.handler = handler
@@ -459,11 +463,20 @@ public class MenuBarHoverTracker: NSResponder {
     public override func mouseEntered(with event: NSEvent) {
         guard MenuBarHoverTracker.isEnabled else { return }
         self.timer?.invalidate()
-        self.timer = Timer.scheduledTimer(withTimeInterval: MenuBarHoverTracker.delay, repeats: false) { [weak self] _ in
+        self.timer = nil
+        
+        if MenuBarHoverTracker.isPopupVisible {
+            self.handler()
+            return
+        }
+        
+        let timer = Timer(timeInterval: MenuBarHoverTracker.delay, repeats: false) { [weak self] _ in
             self?.timer = nil
             guard MenuBarHoverTracker.isEnabled else { return }
             self?.handler()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
     
     public override func mouseExited(with event: NSEvent) {

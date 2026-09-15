@@ -321,6 +321,7 @@ open class Module {
         if popup.occlusionState.rawValue == 8192 || reopen || hover {
             if !hover {
                 popup.level = .normal
+                popup.animationBehavior = .default
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
             

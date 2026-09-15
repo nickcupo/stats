@@ -133,14 +133,15 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
     private var hoverTimer: Timer? = nil
     private var hoverAnchor: NSRect = .zero
     private var hoverMisses: Int = 0
-    private let hoverInterval: TimeInterval = 0.1
-    private let hoverMissesToClose: Int = 3
+    private let hoverInterval: TimeInterval = 0.05
+    private let hoverMissesToClose: Int = 2
     private let hoverTolerance: CGFloat = 6
     
     /// Shows the popup without activating the application (used by the "open on hover" option)
     /// and closes it again once the cursor leaves both the menu bar item and the popup.
     public func showOnHover(anchor: NSRect) {
         self.level = .popUpMenu
+        self.animationBehavior = .none
         self.setIsVisible(true)
         self.orderFrontRegardless()
         self.startHoverTracking(anchor: anchor)
@@ -149,9 +150,11 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
     public func startHoverTracking(anchor: NSRect) {
         self.stopHoverTracking()
         self.hoverAnchor = anchor
-        self.hoverTimer = Timer.scheduledTimer(withTimeInterval: self.hoverInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: self.hoverInterval, repeats: true) { [weak self] _ in
             self?.checkHover()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.hoverTimer = timer
     }
     
     public func stopHoverTracking() {

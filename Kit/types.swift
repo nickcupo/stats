@@ -77,22 +77,6 @@ public let CombinedModulesSpacings: [KeyValue_t] = [
     KeyValue_t(key: "8", value: "8", additional: 8)
 ]
 
-public let MenuBarSpacings: [KeyValue_t] = [
-    KeyValue_t(key: "none", value: "Default"),
-    KeyValue_t(key: "0", value: "0", additional: 0),
-    KeyValue_t(key: "1", value: "1", additional: 1),
-    KeyValue_t(key: "2", value: "2", additional: 2),
-    KeyValue_t(key: "3", value: "3", additional: 3),
-    KeyValue_t(key: "4", value: "4", additional: 4),
-    KeyValue_t(key: "5", value: "5", additional: 5),
-    KeyValue_t(key: "6", value: "6", additional: 6),
-    KeyValue_t(key: "8", value: "8", additional: 8),
-    KeyValue_t(key: "10", value: "10", additional: 10),
-    KeyValue_t(key: "12", value: "12", additional: 12),
-    KeyValue_t(key: "16", value: "16", additional: 16),
-    KeyValue_t(key: "20", value: "20", additional: 20)
-]
-
 public let PublicIPAddressRefreshIntervals: [KeyValue_t] = [
     KeyValue_t(key: "never", value: "Never"),
     KeyValue_t(key: "separator", value: "separator"),
