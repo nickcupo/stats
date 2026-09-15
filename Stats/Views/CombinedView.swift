@@ -139,6 +139,7 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     private func visibilityCallback(_ state: Bool) {}
     
     @objc private func handleClick() {
+        self.hoverTracker?.noteClick()
         if self.combinedModulesPopup {
             self.togglePopup(hover: false)
         } else {
@@ -214,6 +215,13 @@ internal class CombinedView: NSObject, NSGestureRecognizerDelegate {
     
     private func togglePopup(hover: Bool) {
         guard let popup = self.popup, let item = self.menuBarItem, let window = item.button?.window else { return }
+        
+        // a click on a popup that hover opened pins it instead of toggling it
+        if !hover, popup.isVisible, popup.isHoverTracking {
+            popup.pin()
+            return
+        }
+        
         let openedWindows = NSApplication.shared.windows.filter{ $0 is NSPanel }
         openedWindows.forEach{ $0.setIsVisible(false) }
         

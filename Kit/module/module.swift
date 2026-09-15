@@ -300,6 +300,15 @@ open class Module {
         let hover = notification.userInfo?["hover"] as? Bool ?? false
         let anchor = NSRect(x: buttonOrigin.x, y: buttonOrigin.y, width: buttonCenter*2, height: Constants.Widget.height)
         
+        // a click on a popup that hover opened pins it instead of toggling it
+        if !hover, popup.isVisible, popup.isHoverTracking {
+            if let widget = notification.userInfo?["widget"] as? widget_t {
+                popup.openedBy = widget
+            }
+            popup.pin()
+            return
+        }
+        
         let openedWindows = NSApplication.shared.windows.filter{ $0 is NSPanel }
         openedWindows.forEach{ $0.setIsVisible(false) }
         

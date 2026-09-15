@@ -163,6 +163,22 @@ public class PopupWindow: NSWindow, NSWindowDelegate {
         self.hoverMisses = 0
     }
     
+    /// true while the popup is open because of hover and will close when the cursor leaves
+    public var isHoverTracking: Bool {
+        self.hoverTimer != nil
+    }
+    
+    /// Keeps a hover-opened popup open: it no longer follows the cursor, the app comes forward so the
+    /// popup can be used, and it closes on a click outside (or on the item / close button).
+    public func pin() {
+        self.stopHoverTracking()
+        self.level = .normal
+        self.animationBehavior = .default
+        self.viewController.setCloseButton(true)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        self.makeKeyAndOrderFront(nil)
+    }
+    
     private func checkHover() {
         guard self.isVisible, !self.locked else {
             self.stopHoverTracking()

@@ -391,6 +391,7 @@ public class SWidget {
     }
     
     @objc private func togglePopup() {
+        self.hoverTracker?.noteClick()
         self.openPopup(hover: false)
     }
     
@@ -472,6 +473,11 @@ public class MenuBarHoverTracker: NSResponder {
     private var trackingArea: NSTrackingArea? = nil
     private var timer: Timer? = nil
     private let handler: () -> Void
+    private var lastClick: Date = .distantPast
+    /// a click on the item makes AppKit refresh its tracking area, which fires a spurious mouseEntered;
+    /// hover is ignored for this long after a click so a click never re-opens what it just closed
+    private let clickGrace: TimeInterval = 0.5
+    
     public init(button: NSView, handler: @escaping () -> Void) {
         self.button = button
         self.handler = handler
@@ -504,8 +510,19 @@ public class MenuBarHoverTracker: NSResponder {
         self.trackingArea = nil
     }
     
+    /// call when the item is clicked
+    public func noteClick() {
+        self.lastClick = Date()
+        self.timer?.invalidate()
+        self.timer = nil
+    }
+    
+    private var recentlyClicked: Bool {
+        Date().timeIntervalSince(self.lastClick) < self.clickGrace
+    }
+    
     public override func mouseEntered(with event: NSEvent) {
-        guard MenuBarHoverTracker.isEnabled else { return }
+        guard MenuBarHoverTracker.isEnabled, !self.recentlyClicked else { return }
         self.timer?.invalidate()
         self.timer = nil
         
@@ -516,8 +533,8 @@ public class MenuBarHoverTracker: NSResponder {
         
         let timer = Timer(timeInterval: MenuBarHoverTracker.delay, repeats: false) { [weak self] _ in
             self?.timer = nil
-            guard MenuBarHoverTracker.isEnabled else { return }
-            self?.handler()
+            guard let s = self, MenuBarHoverTracker.isEnabled, !s.recentlyClicked else { return }
+            s.handler()
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -687,6 +704,7 @@ public class MenuBar {
     }
     
     @objc private func togglePopup() {
+        self.hoverTracker?.noteClick()
         self.openPopup(hover: false)
     }
     
